@@ -56,29 +56,33 @@ export default {
   methods: {
     accept() {
       if (!this.invite) return
+
+      // Save invite data locally before clearing the store
+      const invite = { ...this.invite }
+
       const socket = this.$root.socket
       if (socket) {
         socket.emit('tandem_invite_response', {
-          inviteId: this.invite.inviteId,
+          inviteId: invite.inviteId,
           accepted: true
         })
       }
 
       // Set up tandem session state
       this.$store.commit('setTandemSession', {
-        id: this.invite.sessionId,
-        libraryItemId: this.invite.libraryItemId,
-        episodeId: this.invite.episodeId,
-        displayTitle: this.invite.displayTitle,
+        id: invite.sessionId,
+        libraryItemId: invite.libraryItemId,
+        episodeId: invite.episodeId,
+        displayTitle: invite.displayTitle,
         members: []
       })
       this.$store.commit('setTandemInvite', null)
 
       // Start playback of the invited book at the synced position
       this.$eventBus.$emit('play-item', {
-        libraryItemId: this.invite.libraryItemId,
-        episodeId: this.invite.episodeId || null,
-        startTime: this.invite.position || 0
+        libraryItemId: invite.libraryItemId,
+        episodeId: invite.episodeId || null,
+        startTime: invite.position || 0
       })
 
       // Start tandem sync after a short delay to let the player load
