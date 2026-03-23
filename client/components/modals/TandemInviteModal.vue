@@ -93,13 +93,19 @@ export default {
         const episodeId = this.$store.state.streamEpisodeId
         if (!libraryItem) return
 
+        // Get current position from the player container ref
+        const playerContainer = this.$root.$children?.[0]?.$refs?.mediaPlayerContainer
+        const currentPosition = playerContainer?.currentTime || 0
+        const isPlaying = playerContainer?.isPlaying || false
+
         const payload = {
           toUserId: user.id,
           libraryItemId: libraryItem.id,
           episodeId: episodeId || null,
           displayTitle: libraryItem.media?.metadata?.title || 'Unknown',
-          currentPosition: this.$eventBus.playerHandler?.getCurrentTime() || 0,
-          playbackSpeed: this.$store.getters['user/getUserSetting']('playbackRate') || 1
+          currentPosition,
+          playbackSpeed: this.$store.getters['user/getUserSetting']('playbackRate') || 1,
+          isPlaying
         }
 
         const result = await this.$axios.$post('/api/tandem/invite', payload)

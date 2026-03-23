@@ -28,7 +28,7 @@ class TandemController {
    * @param {import('express').Response} res
    */
   async invite(req, res) {
-    const { toUserId, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed } = req.body
+    const { toUserId, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed, isPlaying } = req.body
     if (!toUserId || !libraryItemId) {
       return res.status(400).json({ error: 'toUserId and libraryItemId are required' })
     }
@@ -41,7 +41,8 @@ class TandemController {
       episodeId || null,
       displayTitle || '',
       currentPosition || 0,
-      playbackSpeed || 1
+      playbackSpeed || 1,
+      !!isPlaying
     )
 
     if (!result) {

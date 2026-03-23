@@ -62,9 +62,10 @@ class TandemManager {
    * @param {string} displayTitle
    * @param {number} currentPosition position in seconds
    * @param {number} playbackSpeed
+   * @param {boolean} isPlaying whether the host is currently playing
    * @returns {TandemSession}
    */
-  createSession(userId, socketId, username, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed) {
+  createSession(userId, socketId, username, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed, isPlaying) {
     // Leave any existing session first
     this.leaveSession(userId)
 
@@ -77,7 +78,7 @@ class TandemManager {
       members: new Map(),
       canonicalPosition: currentPosition || 0,
       canonicalTimestamp: Date.now(),
-      isPaused: true,
+      isPaused: !isPlaying,
       playbackSpeed: playbackSpeed || 1,
       createdAt: Date.now()
     }
@@ -137,8 +138,7 @@ class TandemManager {
       socket.join(`tandem:${session.id}`)
     }
 
-    // Pause when new member joins so they can sync
-    session.isPaused = true
+    // Update canonical position (don't pause — let the new member sync to current state)
     this.updateCanonicalPosition(session)
 
     Logger.info(`[TandemManager] User "${username}" joined session "${sessionId}"`)
@@ -279,9 +279,10 @@ class TandemManager {
    * @param {string} displayTitle
    * @param {number} currentPosition
    * @param {number} playbackSpeed
+   * @param {boolean} isPlaying
    * @returns {{ inviteId: string, session: TandemSession }|null}
    */
-  createInvite(fromUserId, fromUsername, toUserId, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed) {
+  createInvite(fromUserId, fromUsername, toUserId, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed, isPlaying) {
     // Check if target user is already in a session
     if (this.userSessionMap.has(toUserId)) {
       Logger.warn(`[TandemManager] Cannot invite user "${toUserId}" — already in a session`)
@@ -293,7 +294,7 @@ class TandemManager {
     if (!session || session.libraryItemId !== libraryItemId) {
       const fromClient = this.getClientForUser(fromUserId)
       if (!fromClient) return null
-      session = this.createSession(fromUserId, fromClient.id, fromUsername, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed)
+      session = this.createSession(fromUserId, fromClient.id, fromUsername, libraryItemId, episodeId, displayTitle, currentPosition, playbackSpeed, isPlaying)
     }
 
     const inviteId = uuidv4()
@@ -325,7 +326,10 @@ class TandemManager {
       libraryItemId,
       episodeId: episodeId || null,
       displayTitle,
-      sessionId: session.id
+      sessionId: session.id,
+      position: session.canonicalPosition,
+      isPaused: session.isPaused,
+      playbackSpeed: session.playbackSpeed
     })
 
     Logger.info(`[TandemManager] Invite sent from "${fromUsername}" to user "${toUserId}" for "${displayTitle}"`)

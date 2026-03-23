@@ -74,17 +74,17 @@ export default {
       })
       this.$store.commit('setTandemInvite', null)
 
-      // Start playback of the item if not already playing it
-      const currentItemId = this.$store.getters.getLibraryItemIdStreaming
-      if (currentItemId !== this.invite.libraryItemId) {
-        this.$eventBus.$emit('play-item', {
-          libraryItemId: this.invite.libraryItemId,
-          episodeId: this.invite.episodeId || null
-        })
-      }
+      // Start playback of the invited book at the synced position
+      this.$eventBus.$emit('play-item', {
+        libraryItemId: this.invite.libraryItemId,
+        episodeId: this.invite.episodeId || null,
+        startTime: this.invite.position || 0
+      })
 
-      // Start tandem sync
-      this.$eventBus.$emit('tandem-start')
+      // Start tandem sync after a short delay to let the player load
+      setTimeout(() => {
+        this.$eventBus.$emit('tandem-start')
+      }, 500)
       this.show = false
     },
     decline() {
