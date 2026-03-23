@@ -384,10 +384,10 @@ class PlaybackSessionManager {
       return false
     }
 
-    // If user is in a tandem session, override position with canonical position
+    // If user is in a tandem session for THIS book, override position with canonical position
     const tandemManager = SocketAuthority.Server?.tandemManager
     const tandemSession = tandemManager?.getSessionForUser(user.id)
-    if (tandemSession) {
+    if (tandemSession && tandemSession.libraryItemId === session.libraryItemId) {
       tandemManager.updateCanonicalPosition(tandemSession)
       syncData.currentTime = tandemSession.canonicalPosition
       Logger.debug(`[PlaybackSessionManager] Tandem override: position set to ${syncData.currentTime.toFixed(1)}s for user "${user.username}"`)
