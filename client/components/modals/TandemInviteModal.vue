@@ -79,9 +79,8 @@ export default {
     async fetchUsers() {
       this.loading = true
       try {
-        const onlineUsers = await this.$axios.$get('/api/users/online')
-        // Filter out current user
-        this.users = (onlineUsers || []).filter((u) => u.id !== this.currentUserId)
+        const users = await this.$axios.$get('/api/tandem/users')
+        this.users = users || []
       } catch (err) {
         console.error('Failed to fetch online users', err)
         this.users = []

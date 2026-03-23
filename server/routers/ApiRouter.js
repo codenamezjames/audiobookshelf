@@ -243,6 +243,7 @@ class ApiRouter {
     //
     // Tandem Play Routes
     //
+    this.router.get('/tandem/users', TandemController.getOnlineUsers.bind(this))
     this.router.post('/tandem/invite', TandemController.invite.bind(this))
     this.router.get('/tandem/active', TandemController.getActive.bind(this))
     this.router.post('/tandem/:id/leave', TandemController.leave.bind(this))

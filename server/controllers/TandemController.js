@@ -4,6 +4,23 @@ class TandemController {
   constructor() {}
 
   /**
+   * GET /api/tandem/users
+   * Get list of online users (available to any authenticated user, returns minimal info)
+   *
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   */
+  async getOnlineUsers(req, res) {
+    const SocketAuthority = require('../SocketAuthority')
+    const usersOnline = SocketAuthority.getUsersOnline()
+    // Return minimal info — just id and username, filter out current user
+    const users = usersOnline
+      .filter((u) => u.id !== req.user.id)
+      .map((u) => ({ id: u.id, username: u.username }))
+    res.json(users)
+  }
+
+  /**
    * POST /api/tandem/invite
    * Send a tandem invite to another user
    *
