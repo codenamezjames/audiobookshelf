@@ -347,28 +347,25 @@ export default class PlayerHandler {
 
   playPause() {
     if (!this.player) return
+    this.player.playPause()
     if (this.isTandemActive) {
       this.emitTandemAction({ action: this.playerPlaying ? 'pause' : 'play' })
-    } else {
-      this.player.playPause()
     }
   }
 
   play() {
     if (!this.player) return
+    this.player.play()
     if (this.isTandemActive) {
       this.emitTandemAction({ action: 'play' })
-    } else {
-      this.player.play()
     }
   }
 
   pause() {
     if (!this.player) return
+    this.player.pause()
     if (this.isTandemActive) {
       this.emitTandemAction({ action: 'pause' })
-    } else {
-      this.player.pause()
     }
   }
 
