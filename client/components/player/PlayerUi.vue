@@ -36,6 +36,12 @@
           </button>
         </ui-tooltip>
 
+        <ui-tooltip v-if="!isPodcast" direction="top" :text="isTandemActive ? 'Listening Together' : 'Listen Together'">
+          <button :aria-label="isTandemActive ? 'Listening Together' : 'Listen Together'" :class="isTandemActive ? 'text-success' : 'text-gray-300 hover:text-white'" class="mx-1 lg:mx-2" @mousedown.prevent @mouseup.prevent @click.stop="$emit('showListenTogether')">
+            <span class="material-symbols text-2xl">group</span>
+          </button>
+        </ui-tooltip>
+
         <ui-tooltip direction="top" :text="$strings.LabelViewPlayerSettings">
           <button :aria-label="$strings.LabelViewPlayerSettings" class="outline-hidden text-gray-300 mx-1 lg:mx-2 hover:text-white" @mousedown.prevent @mouseup.prevent @click.stop="showPlayerSettings">
             <span class="material-symbols text-2xl sm:text-2.5xl">settings_slow_motion</span>
@@ -180,6 +186,9 @@ export default {
     },
     playbackRateIncrementDecrement() {
       return this.$store.getters['user/getUserSetting']('playbackRateIncrementDecrement')
+    },
+    isTandemActive() {
+      return this.$store.getters.getIsTandemActive
     }
   },
   methods: {

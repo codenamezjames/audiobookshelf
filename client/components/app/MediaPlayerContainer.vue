@@ -53,6 +53,7 @@
       @showBookmarks="showBookmarks"
       @showSleepTimer="showSleepTimerModal = true"
       @showPlayerQueueItems="showPlayerQueueItemsModal = true"
+      @showListenTogether="showTandemInviteModal = true"
     />
 
     <modals-bookmarks-modal v-model="showBookmarksModal" :bookmarks="bookmarks" :current-time="bookmarkCurrentTime" :playback-rate="currentPlaybackRate" :library-item-id="libraryItemId" @select="selectBookmark" />
@@ -60,6 +61,8 @@
     <modals-sleep-timer-modal v-model="showSleepTimerModal" :timer-set="sleepTimerSet" :timer-type="sleepTimerType" :remaining="sleepTimerRemaining" :has-chapters="!!chapters.length" @set="setSleepTimer" @cancel="cancelSleepTimer" @increment="incrementSleepTimer" @decrement="decrementSleepTimer" />
 
     <modals-player-queue-items-modal v-model="showPlayerQueueItemsModal" />
+
+    <modals-tandem-invite-modal v-model="showTandemInviteModal" />
   </div>
 </template>
 
@@ -78,6 +81,7 @@ export default {
       currentTime: 0,
       showSleepTimerModal: false,
       showPlayerQueueItemsModal: false,
+      showTandemInviteModal: false,
       sleepTimerSet: false,
       sleepTimerRemaining: 0,
       sleepTimerType: null,
@@ -543,6 +547,13 @@ export default {
         this.playerHandler.resetPlayer() // Closes player without reporting to server
         this.$store.commit('setMediaPlaying', null)
       }
+    },
+    // Tandem Play
+    tandemStart() {
+      this.playerHandler.startTandem()
+    },
+    tandemStop() {
+      this.playerHandler.stopTandem()
     }
   },
   mounted() {
@@ -552,6 +563,8 @@ export default {
     this.$eventBus.$on('play-queue-item', this.playQueueItem)
     this.$eventBus.$on('play-item', this.playLibraryItem)
     this.$eventBus.$on('pause-item', this.pauseItem)
+    this.$eventBus.$on('tandem-start', this.tandemStart)
+    this.$eventBus.$on('tandem-stop', this.tandemStop)
   },
   beforeDestroy() {
     this.$eventBus.$off('cast-session-active', this.castSessionActive)
@@ -560,6 +573,8 @@ export default {
     this.$eventBus.$off('play-queue-item', this.playQueueItem)
     this.$eventBus.$off('play-item', this.playLibraryItem)
     this.$eventBus.$off('pause-item', this.pauseItem)
+    this.$eventBus.$off('tandem-start', this.tandemStart)
+    this.$eventBus.$off('tandem-stop', this.tandemStop)
   }
 }
 </script>

@@ -23,6 +23,13 @@ export default class PlayerHandler {
     this.listeningTimeSinceSync = 0
 
     this.playInterval = null
+
+    // Tandem Play
+    this.isTandemActive = false
+    this.tandemServerTimeOffset = 0 // local - server time difference
+    this.tandemLatency = 0
+    this.tandemPingCount = 0
+    this.tandemBoundHandler = this.handleTandemState.bind(this)
   }
 
   get isCasting() {
@@ -339,15 +346,30 @@ export default class PlayerHandler {
   }
 
   playPause() {
-    if (this.player) this.player.playPause()
+    if (!this.player) return
+    if (this.isTandemActive) {
+      this.emitTandemAction({ action: this.playerPlaying ? 'pause' : 'play' })
+    } else {
+      this.player.playPause()
+    }
   }
 
   play() {
-    if (this.player) this.player.play()
+    if (!this.player) return
+    if (this.isTandemActive) {
+      this.emitTandemAction({ action: 'play' })
+    } else {
+      this.player.play()
+    }
   }
 
   pause() {
-    if (this.player) this.player.pause()
+    if (!this.player) return
+    if (this.isTandemActive) {
+      this.emitTandemAction({ action: 'pause' })
+    } else {
+      this.player.pause()
+    }
   }
 
   getCurrentTime() {
@@ -381,6 +403,10 @@ export default class PlayerHandler {
     this.initialPlaybackRate = playbackRate // Might be loaded from settings before player is started
     if (!this.player) return
     this.player.setPlaybackRate(playbackRate)
+
+    if (this.isTandemActive) {
+      this.emitTandemAction({ action: 'speed', playbackSpeed: playbackRate })
+    }
   }
 
   seek(time, shouldSync = true) {
@@ -388,9 +414,140 @@ export default class PlayerHandler {
     this.player.seek(time, this.playerPlaying)
     this.ctx.setCurrentTime(time)
 
+    // Emit tandem action if in a session
+    if (this.isTandemActive && shouldSync) {
+      this.emitTandemAction({ action: 'seek', position: time })
+    }
+
     // Update progress if paused
     if (!this.playerPlaying && shouldSync) {
       this.sendProgressSync(time)
     }
+  }
+
+  // ---- Tandem Play ----
+
+  /**
+   * Enter tandem mode — start listening for sync events
+   */
+  startTandem() {
+    this.isTandemActive = true
+    this.tandemPingCount = 0
+    this.ctx.$eventBus.$on('tandem-state', this.tandemBoundHandler)
+
+    // Perform clock sync (3 ping/pong exchanges)
+    this.performClockSync()
+    console.log('[PlayerHandler] Tandem mode started')
+  }
+
+  /**
+   * Exit tandem mode
+   */
+  stopTandem() {
+    this.isTandemActive = false
+    this.ctx.$eventBus.$off('tandem-state', this.tandemBoundHandler)
+    console.log('[PlayerHandler] Tandem mode stopped')
+  }
+
+  /**
+   * Send a playback action to the tandem session via Socket.IO
+   * @param {{ action: string, position?: number, playbackSpeed?: number }} actionData
+   */
+  emitTandemAction(actionData) {
+    if (!this.isTandemActive) return
+    const socket = this.ctx.$root.socket
+    if (socket) {
+      socket.emit('tandem_action', {
+        ...actionData,
+        timestamp: Date.now()
+      })
+    }
+  }
+
+  /**
+   * Handle incoming tandem state broadcasts from server
+   * @param {{ position: number, timestamp: number, isPaused: boolean, playbackSpeed: number, trigger: string }} state
+   */
+  handleTandemState(state) {
+    if (!this.isTandemActive || !this.player) return
+
+    // Apply pause/play state
+    if (state.isPaused && this.playerPlaying) {
+      this.player.pause()
+    } else if (!state.isPaused && !this.playerPlaying) {
+      this.player.play()
+    }
+
+    // Apply playback speed
+    if (state.playbackSpeed && state.playbackSpeed !== this.initialPlaybackRate) {
+      this.setPlaybackRate(state.playbackSpeed)
+    }
+
+    // Calculate expected position
+    let expectedPosition = state.position
+    if (!state.isPaused) {
+      const elapsed = (Date.now() - state.timestamp - this.tandemServerTimeOffset) / 1000
+      expectedPosition = state.position + elapsed * state.playbackSpeed
+    }
+
+    const currentPosition = this.getCurrentTime()
+    const drift = Math.abs(currentPosition - expectedPosition)
+
+    // Drift correction
+    if (drift < 0.5) {
+      // Less than 500ms — do nothing
+    } else if (drift < 2.0) {
+      // 500ms - 2s — gentle speed adjustment to converge
+      const speedAdjust = currentPosition < expectedPosition ? 1.05 : 0.95
+      this.player.setPlaybackRate(state.playbackSpeed * speedAdjust)
+
+      // Reset speed after convergence window
+      setTimeout(() => {
+        if (this.isTandemActive && this.player) {
+          this.player.setPlaybackRate(state.playbackSpeed)
+        }
+      }, 2000)
+    } else {
+      // More than 2s — hard seek
+      console.log(`[PlayerHandler] Tandem drift ${drift.toFixed(1)}s — seeking to ${expectedPosition.toFixed(1)}`)
+      this.player.seek(expectedPosition, this.playerPlaying)
+      this.ctx.setCurrentTime(expectedPosition)
+    }
+  }
+
+  /**
+   * Perform clock sync with server (3 ping/pong exchanges to estimate offset)
+   */
+  performClockSync() {
+    const offsets = []
+    const socket = this.ctx.$root.socket
+    if (!socket) return
+
+    const onPong = (data) => {
+      const now = Date.now()
+      const rtt = now - data.clientTimestamp
+      const oneWay = rtt / 2
+      // Estimate: server time when it sent pong ≈ data.serverTimestamp
+      // Our local time when server sent pong ≈ now - oneWay
+      const offset = (now - oneWay) - data.serverTimestamp
+      offsets.push(offset)
+      this.tandemLatency = oneWay
+
+      this.tandemPingCount++
+      if (this.tandemPingCount < 3) {
+        setTimeout(() => {
+          socket.emit('tandem_ping', { clientTimestamp: Date.now() })
+        }, 100)
+      } else {
+        socket.off('tandem_pong', onPong)
+        // Use median offset
+        offsets.sort((a, b) => a - b)
+        this.tandemServerTimeOffset = offsets[Math.floor(offsets.length / 2)]
+        console.log(`[PlayerHandler] Clock sync complete. Offset: ${this.tandemServerTimeOffset}ms, Latency: ${this.tandemLatency}ms`)
+      }
+    }
+
+    socket.on('tandem_pong', onPong)
+    socket.emit('tandem_ping', { clientTimestamp: Date.now() })
   }
 }

@@ -209,6 +209,11 @@ class SocketAuthority {
             // Cancel any active cover searches for this socket
             this.cancelSocketCoverSearches(socket.id)
 
+            // Leave any active tandem session
+            if (this.Server?.tandemManager) {
+              this.Server.tandemManager.handleDisconnect(socket.id, _client.user.id)
+            }
+
             delete this.clients[socket.id]
           }
         })
@@ -232,6 +237,14 @@ class SocketAuthority {
           Logger.debug(`[SocketAuthority] Received ping from socket ${user.username || 'No User'}`)
           socket.emit('pong')
         })
+
+        //
+        // Tandem Play events
+        //
+        socket.on('tandem_invite_response', (payload) => this.handleTandemInviteResponse(socket, payload))
+        socket.on('tandem_action', (payload) => this.handleTandemAction(socket, payload))
+        socket.on('tandem_ping', (payload) => this.handleTandemPing(socket, payload))
+        socket.on('tandem_leave', () => this.handleTandemLeave(socket))
       })
     })
   }
@@ -403,6 +416,68 @@ class SocketAuthority {
     // Since we don't track socket-to-request mapping, we log this for debugging
     // The client will handle reconnection gracefully
     Logger.debug(`[SocketAuthority] Socket ${socketId} disconnected, any active searches will timeout`)
+  }
+
+  // ---- Tandem Play Handlers ----
+
+  /**
+   * Handle tandem invite response (accept/decline)
+   * @param {SocketIO.Socket} socket
+   * @param {{ inviteId: string, accepted: boolean }} payload
+   */
+  handleTandemInviteResponse(socket, payload) {
+    const client = this.clients[socket.id]
+    if (!client?.user) {
+      Logger.error('[SocketAuthority] Unauthorized tandem_invite_response')
+      return
+    }
+    if (!this.Server?.tandemManager) return
+
+    const { inviteId, accepted } = payload
+    if (!inviteId) return
+
+    this.Server.tandemManager.respondToInvite(inviteId, client.user.id, socket.id, client.user.username, !!accepted)
+  }
+
+  /**
+   * Handle tandem playback action (play/pause/seek/speed)
+   * @param {SocketIO.Socket} socket
+   * @param {{ action: string, position?: number, playbackSpeed?: number, timestamp?: number }} payload
+   */
+  handleTandemAction(socket, payload) {
+    const client = this.clients[socket.id]
+    if (!client?.user) {
+      Logger.error('[SocketAuthority] Unauthorized tandem_action')
+      return
+    }
+    if (!this.Server?.tandemManager) return
+
+    this.Server.tandemManager.syncAction(client.user.id, payload)
+  }
+
+  /**
+   * Handle tandem ping for latency estimation
+   * @param {SocketIO.Socket} socket
+   * @param {{ clientTimestamp: number }} payload
+   */
+  handleTandemPing(socket, payload) {
+    const client = this.clients[socket.id]
+    if (!client?.user) return
+    if (!this.Server?.tandemManager) return
+
+    this.Server.tandemManager.handlePing(client.user.id, socket.id, payload?.clientTimestamp)
+  }
+
+  /**
+   * Handle user leaving tandem session
+   * @param {SocketIO.Socket} socket
+   */
+  handleTandemLeave(socket) {
+    const client = this.clients[socket.id]
+    if (!client?.user) return
+    if (!this.Server?.tandemManager) return
+
+    this.Server.tandemManager.leaveSession(client.user.id)
   }
 }
 module.exports = new SocketAuthority()

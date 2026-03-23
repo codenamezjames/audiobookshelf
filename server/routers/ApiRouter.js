@@ -35,6 +35,7 @@ const MiscController = require('../controllers/MiscController')
 const ShareController = require('../controllers/ShareController')
 const StatsController = require('../controllers/StatsController')
 const ApiKeyController = require('../controllers/ApiKeyController')
+const TandemController = require('../controllers/TandemController')
 
 class ApiRouter {
   constructor(Server) {
@@ -42,6 +43,8 @@ class ApiRouter {
     this.auth = Server.auth
     /** @type {import('../managers/PlaybackSessionManager')} */
     this.playbackSessionManager = Server.playbackSessionManager
+    /** @type {import('../managers/TandemManager')} */
+    this.tandemManager = Server.tandemManager
     /** @type {import('../managers/AbMergeManager')} */
     this.abMergeManager = Server.abMergeManager
     /** @type {import('../managers/BackupManager')} */
@@ -236,6 +239,13 @@ class ApiRouter {
     this.router.get('/session/:id', SessionController.openSessionMiddleware.bind(this), SessionController.getOpenSession.bind(this))
     this.router.post('/session/:id/sync', SessionController.openSessionMiddleware.bind(this), SessionController.sync.bind(this))
     this.router.post('/session/:id/close', SessionController.openSessionMiddleware.bind(this), SessionController.close.bind(this))
+
+    //
+    // Tandem Play Routes
+    //
+    this.router.post('/tandem/invite', TandemController.invite.bind(this))
+    this.router.get('/tandem/active', TandemController.getActive.bind(this))
+    this.router.post('/tandem/:id/leave', TandemController.leave.bind(this))
 
     //
     // Podcast Routes

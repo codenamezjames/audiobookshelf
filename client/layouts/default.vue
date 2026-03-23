@@ -23,6 +23,8 @@
     <modals-share-modal />
     <prompt-confirm />
     <readers-reader />
+
+    <modals-tandem-notification-modal v-model="showTandemNotification" />
   </div>
 </template>
 
@@ -38,7 +40,8 @@ export default {
       socketConnectionToastId: null,
       currentLang: null,
       multiSessionOtherSessionId: null, // Used for multiple sessions open warning toast
-      multiSessionCurrentSessionId: null // Used for multiple sessions open warning toast
+      multiSessionCurrentSessionId: null, // Used for multiple sessions open warning toast
+      showTandemNotification: false
     }
   },
   watch: {
@@ -49,6 +52,11 @@ export default {
 
       this.$store.commit('globals/resetSelectedMediaItems', [])
       this.updateBodyClass()
+    },
+    '$store.state.tandemInvite'(val) {
+      if (val) {
+        this.showTandemNotification = true
+      }
     }
   },
   computed: {
@@ -379,6 +387,29 @@ export default {
       // Refresh providers cache
       this.$store.dispatch('scanners/refreshProviders')
     },
+    // Tandem Play handlers
+    tandemInviteReceived(invite) {
+      this.$store.commit('setTandemInvite', invite)
+    },
+    tandemMemberJoined(data) {
+      this.$store.commit('updateTandemMembers', data.members)
+      this.$toast.info(`${data.username} joined the listening session`)
+    },
+    tandemMemberLeft(data) {
+      this.$store.commit('updateTandemMembers', data.members)
+      this.$toast.info(`A listener left the session`)
+    },
+    tandemStateUpdate(state) {
+      this.$store.commit('updateTandemState', state)
+      this.$eventBus.$emit('tandem-state', state)
+    },
+    tandemSessionEnded() {
+      this.$store.commit('setTandemSession', null)
+      this.$toast.info('Tandem listening session ended')
+    },
+    tandemInviteDeclined(data) {
+      this.$toast.info(`${data.username} declined the invite`)
+    },
     initializeSocket() {
       if (this.$root.socket) {
         // Can happen in dev due to hot reload
@@ -477,6 +508,14 @@ export default {
       // Custom metadata provider Listeners
       this.socket.on('custom_metadata_provider_added', this.customMetadataProviderAdded)
       this.socket.on('custom_metadata_provider_removed', this.customMetadataProviderRemoved)
+
+      // Tandem Play Listeners
+      this.socket.on('tandem_invite', this.tandemInviteReceived)
+      this.socket.on('tandem_joined', this.tandemMemberJoined)
+      this.socket.on('tandem_left', this.tandemMemberLeft)
+      this.socket.on('tandem_state', this.tandemStateUpdate)
+      this.socket.on('tandem_ended', this.tandemSessionEnded)
+      this.socket.on('tandem_invite_declined', this.tandemInviteDeclined)
     },
     showUpdateToast(versionData) {
       var ignoreVersion = localStorage.getItem('ignoreVersion')

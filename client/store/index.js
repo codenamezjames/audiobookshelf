@@ -28,7 +28,10 @@ export const state = () => ({
   openModal: null,
   innerModalOpen: false,
   lastBookshelfScrollData: {},
-  routerBasePath: '/'
+  routerBasePath: '/',
+  // Tandem Play
+  tandemSession: null,
+  tandemInvite: null
 })
 
 export const getters = {
@@ -61,6 +64,12 @@ export const getters = {
   getHomeBookshelfView: (state) => {
     if (!state.serverSettings || isNaN(state.serverSettings.homeBookshelfView)) return Constants.BookshelfView.STANDARD
     return state.serverSettings.homeBookshelfView
+  },
+  getIsTandemActive: (state) => {
+    return !!state.tandemSession
+  },
+  getTandemSession: (state) => {
+    return state.tandemSession
   }
 }
 
@@ -243,5 +252,27 @@ export const mutations = {
   },
   setInnerModalOpen(state, val) {
     state.innerModalOpen = val
+  },
+  // Tandem Play mutations
+  setTandemSession(state, session) {
+    state.tandemSession = session
+  },
+  setTandemInvite(state, invite) {
+    state.tandemInvite = invite
+  },
+  updateTandemState(state, tandemState) {
+    if (!state.tandemSession) return
+    state.tandemSession = {
+      ...state.tandemSession,
+      position: tandemState.position,
+      isPaused: tandemState.isPaused,
+      playbackSpeed: tandemState.playbackSpeed,
+      members: tandemState.members,
+      timestamp: tandemState.timestamp
+    }
+  },
+  updateTandemMembers(state, members) {
+    if (!state.tandemSession) return
+    state.tandemSession = { ...state.tandemSession, members }
   }
 }
